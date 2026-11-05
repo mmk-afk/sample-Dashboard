@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LOG 문제 분석 대시보드</title>
+<style>
+:root{
+  --bg:#f5f6f8; --card:#fff; --text:#1c2330; --muted:#667085; --line:#e3e6ec;
+  --accent:#2457d6; --accent-ink:#fff;
+  --err:#d92d20; --warn:#dc8a00; --info:#2e7d5b; --other:#8a94a6;
+  --errbg:#fdecea; --warnbg:#fff4de; --okbg:#e6f4ec; --code:#f0f2f6;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#12151b; --card:#1a1f28; --text:#e6e9ef; --muted:#9aa4b5; --line:#2b3240;
+    --accent:#6c93ff; --accent-ink:#0c1020;
+    --err:#ff6b5e; --warn:#f2b441; --info:#52c08c; --other:#7d889b;
+    --errbg:#3a1d1b; --warnbg:#3a2f14; --okbg:#173325; --code:#12161d;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.55 "Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif}
+.wrap{max-width:1120px;margin:0 auto;padding:20px 16px 60px}
+header h1{margin:0 0 4px;font-size:22px}
+header p{margin:0 0 18px;color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+.card h2{margin:0 0 12px;font-size:16px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media(max-width:720px){.grid2,.grid3{grid-template-columns:1fr}}
+label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+input[type=text],input[type=password],textarea{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font:inherit}
+textarea{font-family:Consolas,"Courier New",monospace;font-size:12.5px;resize:vertical}
+input:focus,textarea:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+button{font:inherit;padding:9px 16px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button:disabled{opacity:.55;cursor:not-allowed}
+.hint{font-size:12.5px;color:var(--muted)}
+.chk{display:inline-flex;gap:6px;align-items:center;font-size:13px;color:var(--muted);margin:0}
+details summary{cursor:pointer;color:var(--muted);font-size:13px}
+.msg{padding:10px 12px;border-radius:8px;margin-top:12px;font-size:14px}
+.msg.err{background:var(--errbg);color:var(--err)}
+.msg.info{background:var(--code);color:var(--muted)}
+.hidden{display:none}
+/* result */
+.summary li{margin:4px 0}
+.verdict{display:inline-block;padding:3px 10px;border-radius:99px;font-weight:700;font-size:13px}
+.v-match{background:var(--okbg);color:var(--info)}
+.v-mismatch{background:var(--errbg);color:var(--err)}
+.v-partial,.v-na{background:var(--warnbg);color:var(--warn)}
+.kpi{border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--bg)}
+.kpi .n{font-size:26px;font-weight:700}
+.kpi .l{font-size:12.5px;color:var(--muted)}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+@media(max-width:720px){.kpis{grid-template-columns:repeat(2,1fr)}}
+.cause{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px}
+.cause h3{margin:0 0 6px;font-size:15px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.rank{background:var(--accent);color:var(--accent-ink);border-radius:6px;padding:0 8px;font-size:13px}
+.bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;width:120px}
+.bar i{display:block;height:100%;background:var(--accent)}
+.ev{font-family:Consolas,monospace;font-size:12px;background:var(--code);border-radius:6px;padding:4px 8px;margin:4px 0;word-break:break-all}
+.ev b{color:var(--accent);margin-right:6px}
+.ev.bad{color:var(--warn)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+td.mono{font-family:Consolas,monospace;font-size:12px;word-break:break-all}
+.lv{font-weight:700;font-size:12px}
+.lv.ERROR{color:var(--err)}.lv.WARN{color:var(--warn)}.lv.INFO{color:var(--info)}
+.legend{display:flex;gap:14px;font-size:12.5px;color:var(--muted);margin-top:6px}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;background:var(--c)}
+.todo label{display:flex;gap:8px;align-items:flex-start;color:var(--text);font-size:14px;margin:6px 0}
+.pri{font-size:12px;color:var(--muted)}
+svg text{fill:var(--muted);font-size:10px}
+/* problem highlighting */
+.alert{border:2px solid var(--err);background:var(--errbg);border-radius:12px;padding:14px 16px;margin-bottom:16px}
+.alert.ok{border-color:var(--info);background:var(--okbg)}
+.alert h2{margin:0 0 8px;font-size:16px;color:var(--err)}
+.alert.ok h2{color:var(--info)}
+.alert ul{margin:0;padding-left:0;list-style:none}
+.alert li{margin:6px 0;display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap}
+.cnt{background:var(--err);color:#fff;border-radius:99px;padding:0 9px;font-size:12px;font-weight:700;white-space:nowrap}
+.alert code{font-family:Consolas,monospace;font-size:12px;word-break:break-all}
+.logtools{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:8px;font-size:13px;color:var(--muted)}
+.logbody{max-height:520px;overflow:auto;border:1px solid var(--line);border-radius:8px;background:var(--code);font-family:Consolas,monospace;font-size:12px}
+.ln{display:flex;gap:8px;padding:2px 8px;border-left:4px solid transparent;white-space:pre-wrap;word-break:break-all}
+.ln .no{color:var(--muted);min-width:44px;text-align:right;flex:none;user-select:none}
+.ln.ERROR{background:var(--errbg);border-left-color:var(--err);color:var(--err);font-weight:700}
+.ln.WARN{background:var(--warnbg);border-left-color:var(--warn)}
+.ln.ev{outline:2px solid var(--accent);outline-offset:-2px}
+.ln.flash{animation:fl 1.6s}
+@keyframes fl{0%,60%{box-shadow:0 0 0 3px var(--accent) inset}100%{box-shadow:none}}
+.tag{flex:none;background:var(--accent);color:var(--accent-ink);border-radius:5px;padding:0 6px;font-size:11px;font-weight:700;font-family:"Malgun Gothic",sans-serif}
+.gap{color:var(--muted);text-align:center;padding:2px;font-style:italic}
+#onlyProb:checked ~ .logbody .ln.plain{display:none}
+.ev a,a.evlink{color:inherit;text-decoration:none}
+.ev b{cursor:pointer;text-decoration:underline}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>LOG 문제 분석 대시보드</h1>
+  <p>LOG를 입력하면 AI가 문제점과 원인 후보를 근거 LOG 라인과 함께 제시합니다. 최종 원인 확정과 조치는 담당자가 판단합니다.</p>
+</header>
+
+<section class="card" aria-label="설정">
+  <h2>1. API 설정</h2>
+  <div class="grid3">
+    <div><label for="apiKey">API Key (필수)</label><input id="apiKey" type="password" autocomplete="off" placeholder="API Key 입력"></div>
+    <div><label for="model">모델명</label><input id="model" type="text" value="gpt-5-nano" list="models"><datalist id="models"><option value="gpt-6-luna"><option value="gpt-5-nano"><option value="openai/gpt-5-nano"></datalist></div>
+    <div><label for="baseUrl">Base URL</label><input id="baseUrl" type="text" value="https://mlapi.run/daef5150-72ef-48ff-8861-df80052ea7ac/v1"></div>
+  </div>
+  <div class="row"><label class="chk"><input type="checkbox" id="remember"> 이 브라우저 세션 동안 API Key 기억 (탭을 닫으면 삭제)</label></div>
+  <p class="hint" style="margin:8px 0 0">API Key는 입력한 Base URL로만 전송되며 파일에 저장되지 않습니다. 공용 PC에서는 기억 옵션을 끄세요.</p>
+</section>
+
+<section class="card" aria-label="LOG 입력">
+  <h2>2. LOG 입력</h2>
+  <label for="log">분석할 LOG (붙여넣기 또는 파일 불러오기)</label>
+  <textarea id="log" rows="12" placeholder="2026-11-05 09:12:03 ERROR [EQP-A12] Transfer timeout ..."></textarea>
+  <div class="row">
+    <input type="file" id="file" accept=".log,.txt,.csv,.out,text/*">
+    <button type="button" id="sample">샘플 LOG 넣기</button>
+    <span class="hint" id="logInfo"></span>
+  </div>
+  <div style="margin-top:12px">
+    <label for="hyp">담당자 가설 (선택) — 입력하면 "이 문제점이 맞는지" 검증합니다</label>
+    <input id="hyp" type="text" placeholder="예: Lot 이송 지연은 설비 A12의 센서 오류 때문이다">
+  </div>
+  <div style="margin-top:12px">
+    <label for="ctx">추가 맥락 (선택) — 설비/공정, 최근 변경 이력 등</label>
+    <input id="ctx" type="text" placeholder="예: 포토 공정 설비 A12, 어제 SW 패치 적용">
+  </div>
+  <div class="row">
+    <button type="button" class="primary" id="run">분석 시작</button>
+    <button type="button" id="dl" class="hidden">결과 HTML 저장</button>
+    <span class="hint" id="status" role="status"></span>
+  </div>
+  <div id="error" class="msg err hidden" role="alert"></div>
+</section>
+
+<div id="result" class="hidden"></div>
+</div>
+
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const MAX_CHARS=60000;
+let lastReportHtml="";
+
+// ---- helpers
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const LEVEL_RE=/\b(FATAL|CRIT(?:ICAL)?|SEVERE|ERROR|ERR|FAIL(?:ED|URE)?|WARN(?:ING)?|INFO|DEBUG|TRACE)\b/i;
+function levelOf(line){
+  const m=line.match(LEVEL_RE); if(!m) return "OTHER";
+  const k=m[1].toUpperCase();
+  if(/^(FATAL|CRIT|CRITICAL|SEVERE|ERROR|ERR|FAIL|FAILED|FAILURE)$/.test(k)) return "ERROR";
+  if(/^WARN/.test(k)) return "WARN";
+  if(k==="INFO") return "INFO";
+  return "OTHER";
+}
+const TS_RE=/(\d{4})[-\/.](\d{2})[-\/.](\d{2})[ T](\d{2}):(\d{2}):(\d{2})/;
+function tsOf(line){
+  const m=line.match(TS_RE); if(!m) return null;
+  return new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6]).getTime();
+}
+function parseLog(text){
+  const lines=text.split(/\r?\n/);
+  while(lines.length&&lines[lines.length-1]==="") lines.pop();
+  return lines.map((t,i)=>({n:i+1,t,lv:levelOf(t),ts:tsOf(t)}));
+}
+function stats(rows){
+  const c={ERROR:0,WARN:0,INFO:0,OTHER:0};
+  rows.forEach(r=>c[r.lv]++);
+  const tss=rows.map(r=>r.ts).filter(x=>x!=null);
+  const min=tss.length?Math.min(...tss):null, max=tss.length?Math.max(...tss):null;
+  // timeline buckets
+  const B=24, buckets=Array.from({length:B},()=>({ERROR:0,WARN:0,INFO:0,OTHER:0}));
+  let labels=[];
+  if(tss.length>1&&max>min){
+    rows.forEach((r,i)=>{ if(r.ts==null) return;
+      const k=Math.min(B-1,Math.floor((r.ts-min)/(max-min+1)*B)); buckets[k][r.lv]++; });
+    for(let i=0;i<B;i+=6) labels.push([i,fmt(min+(max-min)*i/B)]);
+  }else{
+    rows.forEach((r,i)=>{ const k=Math.min(B-1,Math.floor(i/rows.length*B)); buckets[k][r.lv]++; });
+    for(let i=0;i<B;i+=6) labels.push([i,"#"+Math.floor(rows.length*i/B+1)]);
+  }
+  return {c,min,max,buckets,labels,timeBased:tss.length>1&&max>min};
+}
+function fmt(ms){const d=new Date(ms),p=n=>String(n).padStart(2,"0");
+  return `${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;}
+
+// Reduce very long logs: keep head, tail and error/warn lines (+1 line context)
+function prepareForModel(rows){
+  const full=rows.map(r=>`${r.n}| ${r.t.length>400?r.t.slice(0,400)+"…":r.t}`).join("\n");
+  if(full.length<=MAX_CHARS) return {text:full,trimmed:false};
+  const keep=new Set();
+  rows.slice(0,150).forEach(r=>keep.add(r.n));
+  rows.slice(-150).forEach(r=>keep.add(r.n));
+  rows.forEach(r=>{ if(r.lv==="ERROR"||r.lv==="WARN"){keep.add(r.n-1);keep.add(r.n);keep.add(r.n+1);} });
+  const out=[]; let prev=0, size=0;
+  for(const r of rows){
+    if(!keep.has(r.n)) continue;
+    const l=`${r.n}| ${r.t.length>300?r.t.slice(0,300)+"…":r.t}`;
+    if(size+l.length>MAX_CHARS) {out.push("...(길이 제한으로 이후 생략)");break;}
+    if(prev&&r.n!==prev+1) out.push("...(생략)");
+    out.push(l); size+=l.length+1; prev=r.n;
+  }
+  return {text:out.join("\n"),trimmed:true};
+}
+
+const SYSTEM=`당신은 반도체 생산 라인 시스템 분석 전문가입니다.
+사용자가 제공한 LOG(각 줄 앞에 '줄번호| ' 형식)를 분석해 시스템 문제점과 원인 후보를 제시합니다.
+규칙:
+- LOG에 없는 내용은 추정하거나 지어내지 마세요. 모든 주장에는 근거 줄번호를 명시하세요.
+- 근거가 부족하면 confidence를 낮추고 limitations에 부족한 정보를 적으세요.
+- 담당자 가설이 주어지면 LOG 증거와 대조해 verdict(match|partial|mismatch)를 판정하세요. 가설이 없으면 verdict는 "na".
+- 반드시 아래 JSON 객체 하나만 출력하세요. 설명 문장이나 코드블록 표시는 쓰지 마세요.
+{
+ "summary":["핵심 요약 1","핵심 요약 2","핵심 요약 3"],
+ "hypothesis_check":{"verdict":"match|partial|mismatch|na","reason":"판정 근거"},
+ "causes":[{"title":"원인 후보","confidence":0~100 정수,"explanation":"설명","evidence_lines":[줄번호,...]}],
+ "key_events":[{"line":줄번호,"note":"의미"}],
+ "actions":[{"priority":"high|medium|low","action":"권고 조치"}],
+ "limitations":["한계/추가로 필요한 정보"]
+}
+causes는 가능성 높은 순으로 최대 5개, key_events는 최대 10개. 한국어로 작성하세요.`;
+
+function extractJson(s){
+  s=String(s||"").trim().replace(/^```(?:json)?/i,"").replace(/```$/,"").trim();
+  const a=s.indexOf("{"), b=s.lastIndexOf("}");
+  if(a<0||b<a) throw new Error("모델 응답에서 JSON을 찾지 못했습니다.");
+  return JSON.parse(s.slice(a,b+1));
+}
+
+async function callModel(base,key,model,user){
+  try{ return await callModelOnce(base,key,model,user,true); }
+  catch(e){
+    // 일부 모델/서버는 response_format 미지원 → 없이 재시도
+    if(e.status===400&&/response_format|json_object|unsupported|not support/i.test(e.message)) return await callModelOnce(base,key,model,user,false);
+    throw e;
+  }
+}
+async function callModelOnce(base,key,model,user,useJson){
+  const url=base.replace(/\/+$/,"")+"/chat/completions";
+  const ctl=new AbortController(); const to=setTimeout(()=>ctl.abort(),180000);
+  let res;
+  try{
+    res=await fetch(url,{method:"POST",signal:ctl.signal,
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
+      body:JSON.stringify(Object.assign({model,messages:[{role:"system",content:SYSTEM},{role:"user",content:user}]},useJson?{response_format:{type:"json_object"}}:{}))});
+  }catch(e){
+    if(e.name==="AbortError") throw new Error("응답 시간이 초과되었습니다(180초).");
+    throw new Error("API에 연결하지 못했습니다. 네트워크, Base URL, 또는 브라우저 CORS 허용 여부를 확인하세요. ("+e.message+")");
+  }finally{clearTimeout(to);}
+  const raw=await res.text();
+  if(!res.ok){
+    let d=raw; try{d=JSON.parse(raw).error?.message||raw;}catch(_){}
+    const er=new Error(`API 오류 ${res.status}: ${String(d).slice(0,300)}`); er.status=res.status; throw er;
+  }
+  let j; try{j=JSON.parse(raw);}catch(_){throw new Error("API 응답이 JSON이 아닙니다.");}
+  const content=j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content;
+  if(!content){const fr=j.choices&&j.choices[0]&&j.choices[0].finish_reason; throw new Error("API 응답에 내용이 없습니다."+(fr==="length"?" (모델이 출력 한도에 도달했습니다. LOG를 줄여 다시 시도하세요.)":""));}
+  return content;
+}
+
+// ---- rendering
+function chartSvg(st){
+  const W=640,H=150,pl=28,pb=18,B=st.buckets.length,bw=(W-pl)/B;
+  const mx=Math.max(1,...st.buckets.map(b=>b.ERROR+b.WARN+b.INFO+b.OTHER));
+  const colors={ERROR:"var(--err)",WARN:"var(--warn)",INFO:"var(--info)",OTHER:"var(--other)"};
+  let g="";
+  st.buckets.forEach((b,i)=>{
+    let y=H-pb;
+    ["INFO","OTHER","WARN","ERROR"].forEach(k=>{
+      const h=(b[k]/mx)*(H-pb-8); if(!h) return; y-=h;
+      g+=`<rect x="${pl+i*bw+1}" y="${y.toFixed(1)}" width="${(bw-2).toFixed(1)}" height="${h.toFixed(1)}" fill="${colors[k]}" rx="1"><title>${k} ${b[k]}건</title></rect>`;
+    });
+  });
+  st.labels.forEach(([i,t])=>{g+=`<text x="${pl+i*bw}" y="${H-4}">${esc(t)}</text>`;});
+  g+=`<text x="0" y="12">${mx}</text><line x1="${pl}" y1="${H-pb}" x2="${W}" y2="${H-pb}" stroke="var(--line)"/>`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="시간대별 LOG 건수 차트">${g}</svg>
+  <div class="legend"><span style="--c:var(--err)">ERROR</span><span style="--c:var(--warn)">WARN</span><span style="--c:var(--info)">INFO</span><span style="--c:var(--other)">기타</span></div>`;
+}
+const VERDICT={match:["가설 일치","v-match"],partial:["부분 일치","v-partial"],mismatch:["가설 불일치","v-mismatch"],na:["가설 미입력","v-na"]};
+
+function evLine(rows,n){
+  const r=rows[n-1];
+  if(!Number.isInteger(n)||!r) return `<div class="ev bad"><b>#${esc(n)}</b>LOG에서 확인할 수 없는 줄 번호입니다 (AI 응답 오류 가능)</div>`;
+  return `<div class="ev"><b data-goto="${n}" title="LOG 원문에서 보기">#${n}</b>${esc(r.t.length>300?r.t.slice(0,300)+"…":r.t)}</div>`;
+}
+// 반복되는 오류 패턴 (숫자·시각·ID 제거 후 묶기)
+function patterns(rows){
+  const norm=t=>t.replace(TS_RE,"").replace(/0x[0-9a-f]+/gi,"#").replace(/\b[A-Z]{1,4}[-_]?\d[\w-]*\b/g,m=>/^(E|ERR)\d+$/i.test(m)?m:"#").replace(/\d+/g,"#").replace(/\s+/g," ").trim();
+  const map=new Map();
+  rows.forEach(r=>{ if(r.lv!=="ERROR") return; const k=norm(r.t).slice(0,160);
+    const o=map.get(k)||{k,n:0,first:r.n,last:r.n,sample:r.t}; o.n++; o.last=r.n; map.set(k,o); });
+  return [...map.values()].sort((a,b)=>b.n-a.n).slice(0,5);
+}
+function alertBox(rows,st,causes){
+  if(!st.c.ERROR&&!st.c.WARN) return `<div class="alert ok"><h2>✔ ERROR/WARN으로 감지된 줄이 없습니다</h2><div class="hint">레벨 표기가 없는 LOG일 수 있으니 아래 AI 분석을 확인하세요.</div></div>`;
+  const pats=patterns(rows), top=causes[0];
+  return `<div class="alert" role="alert"><h2>⚠ 문제 감지: ERROR ${st.c.ERROR}건 · WARN ${st.c.WARN}건</h2>
+    ${top?`<div style="margin-bottom:8px"><b>가장 유력한 원인 후보:</b> ${esc(top.title)} (신뢰도 ${Math.max(0,Math.min(100,parseInt(top.confidence,10)||0))}%)</div>`:""}
+    ${pats.length?`<div class="hint" style="margin-bottom:4px;color:inherit">반복 발생 오류 패턴</div><ul>${pats.map(p=>
+      `<li><span class="cnt">${p.n}회</span><code>${esc(p.sample.slice(0,200))}</code><span class="hint">(줄 ${p.first}${p.last!==p.first?" ~ "+p.last:""})</span></li>`).join("")}</ul>`:""}</div>`;
+}
+function logViewer(rows,causes){
+  const evMap={};
+  causes.forEach((c,i)=>(Array.isArray(c.evidence_lines)?c.evidence_lines:[]).forEach(n=>{n=Number(n);(evMap[n]=evMap[n]||[]).push(i+1);}));
+  const MAXR=2000; let list=rows, cut=false;
+  if(rows.length>MAXR){ list=rows.filter(r=>r.lv==="ERROR"||r.lv==="WARN"||evMap[r.n]).slice(0,MAXR); cut=true; }
+  let prev=0, out="";
+  list.forEach(r=>{
+    if(cut&&prev&&r.n!==prev+1) out+=`<div class="gap">… 생략 …</div>`;
+    const ev=evMap[r.n], prob=r.lv==="ERROR"||r.lv==="WARN"||ev;
+    out+=`<div class="ln ${r.lv}${ev?" ev":""}${prob?"":" plain"}" id="L${r.n}"><span class="no">${r.n}</span><span style="flex:1">${esc(r.t)}</span>${ev?ev.map(i=>`<span class="tag" title="원인 후보 ${i}의 근거">원인${i}</span>`).join(""):""}</div>`;
+    prev=r.n;
+  });
+  return `<section class="card"><h2>LOG 원문 (문제 줄 표시)</h2>
+    <div class="legend" style="margin:0 0 8px"><span style="--c:var(--err)">ERROR 줄</span><span style="--c:var(--warn)">WARN 줄</span><span style="--c:var(--accent)">AI가 지목한 근거 줄</span></div>
+    <input type="checkbox" id="onlyProb" checked> <label for="onlyProb" class="chk" style="display:inline">문제 줄만 보기 (해제하면 전체 표시)</label>
+    <div class="logbody" style="margin-top:8px">${out}</div>${cut?`<p class="hint">LOG가 길어 문제 줄 위주로만 표시했습니다.</p>`:""}</section>`;
+}
+function render(ai,rows,st,meta){
+  const arr=x=>Array.isArray(x)?x:[];
+  const hc=ai.hypothesis_check||{}; const v=VERDICT[hc.verdict]||VERDICT.na;
+  const causes=arr(ai.causes).slice(0,5), events=arr(ai.key_events).slice(0,10), actions=arr(ai.actions);
+  const errRows=rows.filter(r=>r.lv==="ERROR").slice(0,30);
+  const period=st.min!=null?`${fmt(st.min)} ~ ${fmt(st.max)}`:"시각 정보 없음";
+  let h=alertBox(rows,st,causes);
+  h+=`<section class="card"><h2>분석 요약 <span class="verdict ${v[1]}" style="margin-left:8px">${v[0]}</span></h2>
+    <ol class="summary" style="margin:0;padding-left:20px">${arr(ai.summary).map(s=>`<li>${esc(s)}</li>`).join("")}</ol>
+    ${hc.reason?`<p class="hint" style="margin:10px 0 0">판정 근거: ${esc(hc.reason)}</p>`:""}
+    ${meta.hyp?`<p class="hint" style="margin:4px 0 0">입력한 가설: ${esc(meta.hyp)}</p>`:""}
+    ${meta.trimmed?`<div class="msg info">LOG가 길어 일부(오류·경고 줄 중심)만 AI에 전달했습니다.</div>`:""}</section>`;
+  h+=`<section class="card"><h2>핵심 지표</h2><div class="kpis">
+    <div class="kpi"><div class="n">${rows.length.toLocaleString()}</div><div class="l">전체 LOG 줄</div></div>
+    <div class="kpi"><div class="n" style="color:var(--err)">${st.c.ERROR}</div><div class="l">ERROR/FAIL</div></div>
+    <div class="kpi"><div class="n" style="color:var(--warn)">${st.c.WARN}</div><div class="l">WARN</div></div>
+    <div class="kpi"><div class="n" style="font-size:15px;padding:8px 0">${esc(period)}</div><div class="l">LOG 기간</div></div></div></section>`;
+  h+=`<section class="card"><h2>${st.timeBased?"시간대별":"줄 순서별"} 이벤트 추이</h2>${chartSvg(st)}</section>`;
+  h+=`<section class="card"><h2>원인 후보 (가능성 순)</h2>`+(causes.length?causes.map((c,i)=>{
+      const cf=Math.max(0,Math.min(100,parseInt(c.confidence,10)||0));
+      return `<div class="cause"><h3><span class="rank">${i+1}</span>${esc(c.title)}
+        <span class="bar" title="신뢰도 ${cf}%"><i style="width:${cf}%"></i></span><span class="pri">신뢰도 ${cf}%</span></h3>
+        <div>${esc(c.explanation)}</div>
+        ${arr(c.evidence_lines).slice(0,8).map(n=>evLine(rows,Number(n))).join("")}</div>`;}).join("")
+      :`<p class="hint">제시된 원인 후보가 없습니다.</p>`)+`</section>`;
+  if(events.length) h+=`<section class="card"><h2>주요 이벤트 (AI 선별)</h2><table><thead><tr><th>줄</th><th>LOG 원문</th><th>의미</th></tr></thead><tbody>`+
+    events.map(e=>{const r=rows[Number(e.line)-1];return `<tr><td>${esc(e.line)}</td><td class="mono">${r?esc(r.t.slice(0,300)):"확인 불가"}</td><td>${esc(e.note)}</td></tr>`;}).join("")+`</tbody></table></section>`;
+  if(errRows.length) h+=`<section class="card"><h2>ERROR 로그 목록 (상위 30건)</h2><table><thead><tr><th>줄</th><th>레벨</th><th>내용</th></tr></thead><tbody>`+
+    errRows.map(r=>`<tr><td>${r.n}</td><td><span class="lv ERROR">ERROR</span></td><td class="mono">${esc(r.t.slice(0,300))}</td></tr>`).join("")+`</tbody></table></section>`;
+  h+=logViewer(rows,causes);
+  h+=`<section class="card todo"><h2>권고 조치 · 확인란</h2>`+(actions.length?actions.map(a=>
+      `<label><input type="checkbox"><span><span class="pri">[${esc(a.priority||"-")}]</span> ${esc(a.action)}</span></label>`).join(""):`<p class="hint">권고 조치가 없습니다.</p>`)+
+    `<p class="hint" style="margin-top:10px">※ AI 결과는 참고용입니다. 원인 확정과 조치는 담당자가 근거 LOG를 확인한 뒤 승인하세요.</p></section>`;
+  const lim=arr(ai.limitations);
+  if(lim.length) h+=`<section class="card"><h2>한계 및 추가 필요 정보</h2><ul style="margin:0;padding-left:20px">${lim.map(l=>`<li>${esc(l)}</li>`).join("")}</ul></section>`;
+  return h;
+}
+
+// ---- events
+const SAMPLE=`2026-11-05 09:10:01 INFO  [EQP-A12] Lot L2411-05 loaded
+2026-11-05 09:10:42 INFO  [EQP-A12] Recipe PHOTO_V3 started
+2026-11-05 09:12:03 WARN  [EQP-A12] Wafer position sensor S3 reading unstable (retry 1/3)
+2026-11-05 09:12:09 WARN  [EQP-A12] Wafer position sensor S3 reading unstable (retry 2/3)
+2026-11-05 09:12:15 ERROR [EQP-A12] Wafer position sensor S3 timeout, code=E4012
+2026-11-05 09:12:16 ERROR [MES] Transfer request TR-8841 timeout waiting EQP-A12 ack
+2026-11-05 09:13:30 INFO  [EQP-A12] Operator reset issued
+2026-11-05 09:14:02 INFO  [EQP-A12] Recipe PHOTO_V3 resumed
+2026-11-05 09:31:44 WARN  [MES] Queue depth for EQP-A12 exceeded 20
+2026-11-05 09:40:10 INFO  [EQP-A12] SW patch v2.3.1 applied (scheduled 09:00)
+2026-11-05 09:55:21 ERROR [EQP-A12] Wafer position sensor S3 timeout, code=E4012
+2026-11-05 09:55:22 ERROR [MES] Transfer request TR-8860 timeout waiting EQP-A12 ack
+`;
+function info(){
+  const t=$("log").value; $("logInfo").textContent=t?`${t.split(/\r?\n/).length.toLocaleString()}줄 · ${t.length.toLocaleString()}자`:"";
+}
+$("log").addEventListener("input",info);
+$("sample").addEventListener("click",()=>{$("log").value=SAMPLE;$("hyp").value="Lot 이송 지연은 MES 네트워크 문제 때문이다";info();});
+$("file").addEventListener("change",e=>{
+  const f=e.target.files[0]; if(!f) return;
+  if(f.size>20*1024*1024){showErr("파일이 너무 큽니다(20MB 초과).");return;}
+  const r=new FileReader(); r.onload=()=>{$("log").value=r.result;info();}; r.readAsText(f); });
+try{const k=sessionStorage.getItem("logdash_key"); if(k){$("apiKey").value=k;$("remember").checked=true;}}catch(_){}
+function showErr(m){const e=$("error");e.textContent=m;e.classList.remove("hidden");}
+function clearErr(){$("error").classList.add("hidden");}
+
+$("run").addEventListener("click",async()=>{
+  clearErr();
+  const key=$("apiKey").value.trim(), base=$("baseUrl").value.trim(), model=$("model").value.trim(), text=$("log").value;
+  if(!key) return showErr("API Key를 입력하세요.");
+  if(!/^https?:\/\//i.test(base)) return showErr("Base URL이 올바르지 않습니다.");
+  if(!text.trim()) return showErr("분석할 LOG를 입력하세요.");
+  try{ if($("remember").checked) sessionStorage.setItem("logdash_key",key); else sessionStorage.removeItem("logdash_key"); }catch(_){}
+  const rows=parseLog(text), st=stats(rows), prep=prepareForModel(rows);
+  const hyp=$("hyp").value.trim(), ctx=$("ctx").value.trim();
+  const user=`${ctx?`[추가 맥락]\n${ctx}\n\n`:""}${hyp?`[담당자 가설]\n${hyp}\n\n`:"[담당자 가설]\n없음\n\n"}[LOG]\n${prep.text}`;
+  const btn=$("run"); btn.disabled=true; $("status").textContent="AI가 LOG를 분석하는 중입니다…";
+  try{
+    const content=await callModel(base,key,model,user);
+    let ai; try{ai=extractJson(content);}catch(e){throw new Error("AI 응답을 해석하지 못했습니다: "+e.message+" / 응답 앞부분: "+String(content).slice(0,200));}
+    const html=render(ai,rows,st,{hyp,trimmed:prep.trimmed});
+    const box=$("result"); box.innerHTML=html; box.classList.remove("hidden");
+    lastReportHtml=html; $("dl").classList.remove("hidden");
+    $("status").textContent="분석 완료";
+    box.scrollIntoView({behavior:"smooth",block:"start"});
+  }catch(e){ showErr(e.message); $("status").textContent=""; }
+  finally{ btn.disabled=false; }
+});
+
+$("result").addEventListener("click",e=>{
+  const b=e.target.closest("[data-goto]"); if(!b) return;
+  const el=document.getElementById("L"+b.dataset.goto); if(!el) return;
+  el.scrollIntoView({behavior:"smooth",block:"center"});
+  el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+});
+$("dl").addEventListener("click",()=>{
+  if(!lastReportHtml) return;
+  const css=document.querySelector("style").textContent;
+  const doc=`<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>LOG 분석 결과</title><style>${css}</style></head><body><div class="wrap"><header><h1>LOG 분석 결과</h1><p>${esc(new Date().toLocaleString())} 생성</p></header>${lastReportHtml}</div></body></html>`;
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([doc],{type:"text/html;charset=utf-8"}));
+  a.download="LOG_분석결과.html"; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+});
+})();
+</script>
+</body>
+</html>
